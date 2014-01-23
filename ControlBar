@@ -1,0 +1,338 @@
+package com.editor.view.videoplayer
+{
+	import com.editor.controller.common.KeyboardMap;
+	import com.editor.controller.utils.Utils;
+	
+	import flash.display.MovieClip;
+	import flash.events.Event;
+	import flash.events.MouseEvent;
+	import flash.geom.Point;
+	import flash.geom.Rectangle;
+	
+	import org.osflash.signals.Signal;
+
+	public class ControlBar extends controlBar
+	{
+		private static const _VOLUMEBAR_WIDTH:Number = 90;
+		private static const _LOADINGBAR_LENGTH:Number = 500;
+		private static const _LOADINGBG_LENGTH:Number = 500;
+		private var _volume:Number = 0.5;
+		private var _list:Array = new Array();
+		public var changeVolumeSignal:Signal;
+		public var startVideoPlaySignal:Signal;
+		public var pauseVideoPlaySignal:Signal;
+		public var stopVideoPlaySignal:Signal;
+		public var loadingBarClickSignal:Signal;
+		public var loadingBGClickSignal:Signal;
+		public var playHeadDragSignal:Signal;
+		public var videoPlayerFineAdjustmentSignal:Signal;
+		
+		public function ControlBar()
+		{
+			init();
+		}
+		
+		/**
+		 *  控件说明：
+		 *  playHeadBtn：播放头按钮；
+		 *  loadingBar：进度条， width：500；
+		 *  loadingBarBG：进度条背景, width：500；
+		 *  startBtn：播放按钮；
+		 *  pauseBtn：暂停按钮；
+		 *  stopBtn：停止按钮；
+		 *  volumeBtn：音量按钮， frame1：静音，frame2：低音， frame3：中音，frame4：高音；
+		 *  volumeBar：音量控制条 ， width：90；
+		 *  volumeBG：音量背景， width：90；
+		 *  volumeLabel：音量大小显示标签；
+		 *  realTimeTxt: 当前播放时间文本框；
+		 *  durationTimeTxt: 影片总长度文本框
+		 *  timeLine： 时间分隔线；
+		 */ 
+		private function init():void
+		{
+			updateSpeaker();
+			updateVolumeBar();
+			updateVolumeLabel();
+			this.loadingBar.width = 0;	
+			this.volumeBtn.buttonMode = true;
+			this.volumeBar.buttonMode = true;
+			this.volumeBG.buttonMode = true;
+			this.loadingBar.buttonMode = true;
+			this.loadingBarBG.buttonMode = true;
+			this.volumeBar.width = _VOLUMEBAR_WIDTH * volume;
+			this.volumeLabel.text = String(volume * 100) + "%";
+			
+			this.volumeBG.addEventListener(MouseEvent.MOUSE_DOWN, onVolumeMouseDown);
+			this.volumeBar.addEventListener(MouseEvent.MOUSE_DOWN, onVolumeMouseDown);
+			
+			this.volumeBtn.addEventListener(MouseEvent.CLICK, onVolumeBtnClick);
+			this.startBtn.addEventListener(MouseEvent.CLICK, onStartBtnClick);
+			this.pauseBtn.addEventListener(MouseEvent.CLICK, onPauseBtnClick);
+			this.stopBtn.addEventListener(MouseEvent.CLICK, onStopBtnClick);
+			
+			this.playHeadBtn.addEventListener(MouseEvent.MOUSE_DOWN, onPlayHeadMouseDown);
+			this.playHeadBtn.addEventListener(MouseEvent.MOUSE_UP, onPlayHeadMouseUp);
+			
+			this.leftJumpBtn.addEventListener(MouseEvent.CLICK, onLeftJumpBtnClick);
+			this.rightJumpBtn.addEventListener(MouseEvent.CLICK, onRightJumpBtnClick);
+			
+			this.loadingBar.addEventListener(MouseEvent.CLICK, onLoadingBarClick);
+			this.loadingBarBG.addEventListener(MouseEvent.CLICK, onLoadingBGClick);
+			this.addEventListener(Event.REMOVED_FROM_STAGE, destroy);
+			
+			changeVolumeSignal = new Signal(Number);
+			startVideoPlaySignal = new Signal();
+			pauseVideoPlaySignal = new Signal();
+			stopVideoPlaySignal = new Signal();
+			loadingBarClickSignal = new Signal(Number);
+			loadingBGClickSignal = new Signal(Number);
+			playHeadDragSignal = new Signal(Number);
+			videoPlayerFineAdjustmentSignal = new Signal(String);
+		}
+		
+		private function onLeftJumpBtnClick(event:MouseEvent):void
+		{
+			videoPlayerFineAdjustmentSignal.dispatch(KeyboardMap.LEFT_ARROW);
+		}
+		
+		private function onRightJumpBtnClick(event:MouseEvent):void
+		{
+			videoPlayerFineAdjustmentSignal.dispatch(KeyboardMap.RIGHT_ARROW);
+		}
+		
+		private function onStartBtnClick(event:MouseEvent):void
+		{
+			startVideoPlaySignal.dispatch();
+		}
+		
+		private function onPauseBtnClick(event:MouseEvent):void
+		{
+			pauseVideoPlaySignal.dispatch();
+		}
+		
+		private function onStopBtnClick(event:MouseEvent):void
+		{
+			stopVideoPlaySignal.dispatch();
+		}
+		
+		private function onPlayHeadMouseDown(event:MouseEvent):void
+		{
+			this.playHeadBtn.addEventListener(MouseEvent.MOUSE_MOVE, onPlayHeadMouseMove);
+			this.playHeadBtn.addEventListener(MouseEvent.MOUSE_OUT, onPlayHeadMouseOut);
+		}
+		
+		protected function onPlayHeadMouseMove(event:MouseEvent):void
+		{
+			var position:Number = Math.abs(mouseX / _LOADINGBG_LENGTH);
+			trace ("position:" + position, mouseX);
+			playHeadDragSignal.dispatch(position);
+		}
+		
+		protected function onPlayHeadMouseOut(event:MouseEvent):void
+		{
+			this.playHeadBtn.removeEventListener(MouseEvent.MOUSE_MOVE, onPlayHeadMouseMove);
+			this.playHeadBtn.removeEventListener(MouseEvent.MOUSE_OUT, onPlayHeadMouseOut);
+		}
+		
+		protected function onPlayHeadMouseUp(event:MouseEvent):void
+		{
+			this.playHeadBtn.removeEventListener(MouseEvent.MOUSE_MOVE, onPlayHeadMouseMove);
+		}
+		
+		public function updatePosition():void
+		{
+			if (mouseX > _LOADINGBAR_LENGTH - playHeadBtn.width){
+				this.loadingBar.width = Math.abs(mouseX);
+				this.playHeadBtn.x = _LOADINGBAR_LENGTH - playHeadBtn.width;
+			}else{
+				this.loadingBar.width = Math.abs(mouseX);
+				this.playHeadBtn.x = Math.abs(mouseX);
+			}
+		}
+		
+		private function onLoadingBarClick(event:MouseEvent):void
+		{
+			var position:Number = Math.abs(mouseX / _LOADINGBG_LENGTH);
+			loadingBarClickSignal.dispatch(position);
+		}
+		
+		public function updateLoadingBarByMouseClick():void
+		{
+			if (mouseX > _LOADINGBAR_LENGTH - playHeadBtn.width){
+				this.loadingBar.width = Math.abs(mouseX);
+				this.playHeadBtn.x = _LOADINGBAR_LENGTH - playHeadBtn.width;
+			}else{
+				this.loadingBar.width = Math.abs(mouseX);
+				this.playHeadBtn.x = Math.abs(mouseX);
+			}
+		}
+		
+		private function onLoadingBGClick(event:MouseEvent):void
+		{
+			var position:Number = Math.abs(mouseX / _LOADINGBG_LENGTH);
+			loadingBGClickSignal.dispatch(position); 
+		}
+		
+		public function updateLoadingBGByMouseClick():void
+		{
+			if (mouseX > _LOADINGBAR_LENGTH - playHeadBtn.width){
+				this.loadingBar.width = Math.abs(mouseX);
+				this.playHeadBtn.x = _LOADINGBAR_LENGTH - playHeadBtn.width;
+			}else{
+				this.loadingBar.width = Math.abs(mouseX);
+				this.playHeadBtn.x = Math.abs(mouseX);
+			}
+		}
+		
+
+		/*******************************************************
+		 * 声音相关事件处理
+		 *******************************************************/ 
+		private function onVolumeMouseDown(event:MouseEvent):void
+		{
+			if (mouseX < _VOLUMEBAR_WIDTH + volumeBar.x){
+				this.volumeBar.width = mouseX - this.volumeBar.x; 
+				volume = this.volumeBar.width / _VOLUMEBAR_WIDTH;
+				if (volume >= 0.99){
+					volume = 1;
+					this.volumeLabel.text = "100" + "%";
+				}else{
+					this.volumeLabel.text = Math.round((volume * 100)) + "%";
+				}
+			}
+			changeVolumeSignal.dispatch(volume);
+			this.addEventListener(MouseEvent.MOUSE_MOVE, onVolumeMouseMove);
+			this.addEventListener(MouseEvent.MOUSE_UP, onVolumeMouseUp);
+		}
+		
+		private function onVolumeMouseMove(event:MouseEvent):void
+		{
+			if (mouseX < _VOLUMEBAR_WIDTH + volumeBar.x){
+				this.volumeBar.width = mouseX - this.volumeBar.x;
+				volume = this.volumeBar.width / _VOLUMEBAR_WIDTH;
+				if (volume > 0.99){
+					volume = 1;
+					this.volumeLabel.text = "100" + "%";
+				}else{
+					this.volumeLabel.text = Math.round((volume * 100)) + "%";
+				}
+			}
+			changeVolumeSignal.dispatch(volume);
+		}
+		
+		private function onVolumeMouseUp(event:MouseEvent):void
+		{
+			this.removeEventListener(MouseEvent.MOUSE_MOVE, onVolumeMouseMove);
+			this.removeEventListener(MouseEvent.MOUSE_UP, onVolumeMouseUp);
+		}
+		
+		private function onVolumeBtnClick(event:MouseEvent):void
+		{
+			this.volumeBtn.gotoAndStop(1);
+			volume = 0;
+			changeVolumeSignal.dispatch(volume);
+		}
+		
+		//小喇叭按钮的四种状态设定
+		private function updateSpeaker():void
+		{
+			if (volume <= 0.01){
+				this.volumeBtn.gotoAndStop(1);
+			}else if (volume <= 0.3){
+				this.volumeBtn.gotoAndStop(2)
+			}else if (volume <=0.6){
+				this.volumeBtn.gotoAndStop(3);
+			}else{
+				this.volumeBtn.gotoAndStop(4);
+			}
+		}
+		
+		//设置音量条状态
+		private function updateVolumeBar():void
+		{
+			this.volumeBar.width = volume * _VOLUMEBAR_WIDTH;
+		}
+		
+		//设置音量标签数据
+		private function updateVolumeLabel():void
+		{
+			if (volume > 0.99){
+				this.volumeLabel.text = "100" + "%";
+			}else{
+				this.volumeLabel.text = Math.round((volume * 100)) + "%";
+			}
+		}
+		
+		public function updateLoadingBar(value:Number):void
+		{
+			this.loadingBar.width = value * _LOADINGBAR_LENGTH;
+		}
+		
+		public function updateTime(duration:Number, realTime:Number):void
+		{
+			durationTimeTxt.text = Utils.secondToTimeFomat(duration);
+			realTimeTxt.text = Utils.secondToTimeFomat(realTime);
+		}
+		
+		public function updatePlayHeadPosition(value:Number):void
+		{
+			if (value * _LOADINGBAR_LENGTH >_LOADINGBAR_LENGTH - playHeadBtn.width){
+				this.playHeadBtn.x = _LOADINGBAR_LENGTH - playHeadBtn.width;
+			}else{
+				this.playHeadBtn.x = _LOADINGBAR_LENGTH * value;
+			}
+		}
+		
+		public function get volume():Number
+		{
+			return _volume;
+		}
+		
+		public function set volume(value:Number):void
+		{
+			if (value < 0){
+				this._volume = 0
+			}else if (value > 1){
+				this._volume = 1;
+			}else{
+				_volume = value;
+			}
+			updateSpeaker();
+			updateVolumeBar();
+			updateVolumeLabel();
+		}
+		
+		override public function addEventListener(type:String, listener:Function, useCapture:Boolean = false, priority:int = 0, useWeakReference:Boolean = false):void
+		{
+			_list.push([type,listener,useCapture])
+			super.addEventListener(type,listener,useCapture,priority,useWeakReference)
+		}
+		
+		private function destroy(e:Event):void
+		{
+			if(e.currentTarget != e.target)return;
+			
+			//删除子对象
+			trace("删除前有子对象",numChildren)
+			while(numChildren > 0)
+			{
+				removeChildAt(0);
+			}
+			trace("删除后有子对象",numChildren);
+			
+			//删除动态属性
+			for(var k:String in this){
+				trace("删除属性",k)
+				delete this[k]
+			}
+			
+			//删除侦听
+			trace("删除前注册事件数:" + _list.length)
+			for(var i:uint=0;i<_list.length;i++){
+				trace("删除Listener",_list[i][0])
+				removeEventListener(_list[i][0],_list[i][1],_list[i][2])
+			}
+			_list = null;
+		}
+	}
+}
