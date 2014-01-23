@@ -1,0 +1,46 @@
+package com.editor.style
+{
+	import fl.controls.dataGridClasses.HeaderRenderer;
+	
+	import flash.events.MouseEvent;
+	import flash.text.*;
+	
+	public class DatagridHeaderStyle extends HeaderRenderer
+	{
+		public function DatagridHeaderStyle()
+		{
+			super();
+			addEventListener(MouseEvent.CLICK, onClick)
+		}
+		
+		override protected function drawBackground():void
+		{
+			var format:TextFormat = new TextFormat();
+			format.font = "微软雅黑";
+			format.bold = true;
+			format.size = 12;
+			format.color = 0x666666; 
+			format.align = TextFormatAlign.CENTER;
+			setStyle("textFormat",format);
+			super.drawBackground();  
+		}
+		
+		override protected function drawLayout():void
+		{
+			this.textField.width = this.width;
+			var format:TextFormat = new TextFormat();
+			format.font = "微软雅黑";
+			format.size = 12;
+			format.color = 0x666666;
+			format.align = TextFormatAlign.CENTER;
+			this.textField.setTextFormat(format);
+			super.drawLayout();
+		}
+		
+		private function onClick(event:MouseEvent):void
+		{
+			event.preventDefault();
+			event.stopImmediatePropagation();
+		}
+	}
+}
